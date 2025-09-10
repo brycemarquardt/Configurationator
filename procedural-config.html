@@ -1,0 +1,1007 @@
+<script type="text/javascript">
+  var gk_isXlsx = false;
+  var gk_xlsxFileLookup = {};
+  var gk_fileData = {};
+  function filledCell(cell) {
+    return cell !== "" && cell != null;
+  }
+  function loadFileData(filename) {
+    if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+      try {
+        var workbook = XLSX.read(gk_fileData[filename], { type: "base64" });
+        var firstSheetName = workbook.SheetNames[0];
+        var worksheet = workbook.Sheets[firstSheetName];
+
+        // Convert sheet to JSON to filter blank rows
+        var jsonData = XLSX.utils.sheet_to_json(worksheet, {
+          header: 1,
+          blankrows: false,
+          defval: "",
+        });
+        // Filter out blank rows (rows where all cells are empty, null, or undefined)
+        var filteredData = jsonData.filter((row) => row.some(filledCell));
+
+        // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+        var headerRowIndex = filteredData.findIndex(
+          (row, index) =>
+            row.filter(filledCell).length >=
+            filteredData[index + 1]?.filter(filledCell).length
+        );
+        // Fallback
+        if (headerRowIndex === -1 || headerRowIndex > 25) {
+          headerRowIndex = 0;
+        }
+
+        // Convert filtered JSON back to CSV
+        var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+        csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+        return csv;
+      } catch (e) {
+        console.error(e);
+        return "";
+      }
+    }
+    return gk_fileData[filename] || "";
+  }
+</script>
+<script type="text/javascript">
+  var gk_isXlsx = false;
+  var gk_xlsxFileLookup = {};
+  var gk_fileData = {};
+  function filledCell(cell) {
+    return cell !== "" && cell != null;
+  }
+  function loadFileData(filename) {
+    if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+      try {
+        var workbook = XLSX.read(gk_fileData[filename], { type: "base64" });
+        var firstSheetName = workbook.SheetNames[0];
+        var worksheet = workbook.Sheets[firstSheetName];
+
+        // Convert sheet to JSON to filter blank rows
+        var jsonData = XLSX.utils.sheet_to_json(worksheet, {
+          header: 1,
+          blankrows: false,
+          defval: "",
+        });
+        // Filter out blank rows (rows where all cells are empty, null, or undefined)
+        var filteredData = jsonData.filter((row) => row.some(filledCell));
+
+        // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+        var headerRowIndex = filteredData.findIndex(
+          (row, index) =>
+            row.filter(filledCell).length >=
+            filteredData[index + 1]?.filter(filledCell).length
+        );
+        // Fallback
+        if (headerRowIndex === -1 || headerRowIndex > 25) {
+          headerRowIndex = 0;
+        }
+
+        // Convert filtered JSON back to CSV
+        var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+        csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+        return csv;
+      } catch (e) {
+        console.error(e);
+        return "";
+      }
+    }
+    return gk_fileData[filename] || "";
+  }
+</script>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Configurationator</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Open Sans", Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background-color: #f4f4f4;
+      }
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+      .logo {
+        max-width: 200px;
+        width: 100%;
+        margin: 0 auto 40px;
+        display: block;
+      }
+      h1 {
+        color: #333;
+        text-align: center;
+        padding-bottom: 20px;
+      }
+      .sub-title {
+        display: block;
+        text-align: center;
+        font-size: 32px;
+        color: #666;
+        margin-top: -10px;
+        margin-bottom: 40px;
+      }
+
+      .table-section {
+        max-width: 1100px;
+        margin: 15px auto 60px auto;
+      }
+      h2 {
+        color: #333;
+        margin-top: 2px;
+        margin-left: 0; /* Align with table's left edge */
+      }
+      table {
+        width: 100%; /* Fill table-section width */
+        max-width: 1100px;
+        border-collapse: separate;
+        border-spacing: 0;
+        background-color: white;
+        table-layout: fixed;
+        border: 1px solid #e0e0e0;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        overflow: hidden;
+      }
+      th,
+      td {
+        padding: 12px 15px;
+        border: 1px solid #ddd;
+        text-align: left;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      th {
+        background: linear-gradient(to bottom, #0765cd, #054a9a);
+        color: white;
+        font-weight: bold;
+        font-size: 20px;
+      }
+      td {
+        font-size: 18px;
+      }
+      th:nth-child(1),
+      td:nth-child(1) {
+        width: 40%;
+      }
+      th:nth-child(2),
+      td:nth-child(2),
+      th:nth-child(3),
+      td:nth-child(3) {
+        width: 30%;
+        text-align: center;
+      }
+      th.editable-header {
+        cursor: text;
+      }
+      tr:nth-child(even) {
+        background-color: #f9f9f9;
+      }
+      tr:hover {
+        background-color: #f0f4f8;
+      }
+      .button-container {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-bottom: 10px;
+        padding-bottom: 20px;
+      }
+      .manual-button {
+        display: inline-block;
+        padding: 10px 20px;
+        font-size: 16px;
+        color: white;
+        background-color: #0765cd;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        text-decoration: none;
+      }
+      .manual-button:hover {
+        background-color: #054a9a;
+      }
+      td[contenteditable="true"] {
+        background-color: #e6f0ff;
+        cursor: text;
+      }
+      td[contenteditable="true"]:hover {
+        background-color: #d1e4ff;
+      }
+      .diff-row td {
+        background-color: #ffe6e6;
+      }
+      .diff-cell {
+        background-color: #ffe6e6 !important;
+      }
+      @media print {
+        .logo,
+        .button-container,
+        .manual-button {
+          display: none;
+        }
+        .sub-title,
+        h1,
+        h2,
+        table {
+          display: block;
+        }
+        body {
+          padding: 0;
+          background-color: white;
+        }
+        .container {
+          max-width: 100%;
+          margin: 0;
+        }
+        .table-section {
+          max-width: 100%;
+          margin: 15px 0 60px 0;
+        }
+        h2 {
+          margin-left: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <img src="logo-ce.png" alt="ZOLL Clinical Education Logo" class="logo" />
+      <h1>ZOLL R Series Config MCU 20 - Procedural Defibs Only!</h1>
+      <span class="sub-title" contenteditable="true">Hospital XYZ</span>
+
+      <div class="table-section">
+        <h2>GENERAL SETTINGS</h2>
+        <table>
+          <tr>
+            <th>Configuration Item</th>
+            <th>Default Value</th>
+            <th class="editable-header" contenteditable="true">
+              ZOLL Team Rec's
+            </th>
+          </tr>
+          <tr>
+            <td>Device Identifier</td>
+            <td></td>
+            <td contenteditable="true"></td>
+          </tr>
+          <tr>
+            <td>Configuration Mode Passcode</td>
+            <td>00000000</td>
+            <td contenteditable="true">00000000</td>
+          </tr>
+          <tr>
+            <td>Code Markers</td>
+            <td>Set/Review</td>
+            <td contenteditable="true">Set/Review</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="table-section">
+        <h2>ECG SETTINGS</h2>
+        <table>
+          <tr>
+            <th>Configuration Item</th>
+            <th>Default Value</th>
+            <th class="editable-header" contenteditable="true">
+              ZOLL Team Rec's
+            </th>
+          </tr>
+          <tr>
+            <td>Notch Filter</td>
+            <td>60 Hz</td>
+            <td contenteditable="true">60 Hz</td>
+          </tr>
+          <tr>
+            <td>Display Lead on Power-Up</td>
+            <td>PADDLES/PADS</td>
+            <td contenteditable="true">PADDLES/PADS</td>
+          </tr>
+          <tr>
+            <td>Frequency Response</td>
+            <td>0.5-21 Hz</td>
+            <td contenteditable="true">0.5-21 Hz</td>
+          </tr>
+          <tr>
+            <td>Gain on Power-Up</td>
+            <td>1 cm/mV</td>
+            <td contenteditable="true">1.5 cm/mV</td>
+          </tr>
+          <tr>
+            <td>Enable Leads Off</td>
+            <td>Yes</td>
+            <td contenteditable="true">Yes</td>
+          </tr>
+          <tr>
+            <td>Enable Pacer Detection</td>
+            <td>Yes</td>
+            <td contenteditable="true">Yes</td>
+          </tr>
+          <tr>
+            <td>Display ECG Scale</td>
+            <td>No</td>
+            <td contenteditable="true">No</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="table-section">
+        <h2>AUDIO SETTINGS</h2>
+        <table>
+          <tr>
+            <th>Configuration Item</th>
+            <th>Default Value</th>
+            <th class="editable-header" contenteditable="true">
+              ZOLL Team Rec's
+            </th>
+          </tr>
+          <tr>
+            <td>QRS Volume on Power-Up</td>
+            <td>On</td>
+            <td contenteditable="true">Off</td>
+          </tr>
+          <tr>
+            <td>Low Battery Tone</td>
+            <td>5 Min</td>
+            <td contenteditable="true">5 Min</td>
+          </tr>
+          <tr>
+            <td>Enable Corrective Voice Prompts</td>
+            <td>Yes</td>
+            <td contenteditable="true">Yes</td>
+          </tr>
+          <tr>
+            <td>Voice Prompt Volume (1 = MIN, 3 = MAX)</td>
+            <td>2</td>
+            <td contenteditable="true">1</td>
+          </tr>
+          <tr>
+            <td>Silence Message Beeps</td>
+            <td>No</td>
+            <td contenteditable="true">Yes</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="table-section">
+        <h2>BASIC DEFIB SETTINGS</h2>
+        <table>
+          <tr>
+            <th>Configuration Item</th>
+            <th>Default Value</th>
+            <th class="editable-header" contenteditable="true">
+              ZOLL Team Rec's
+            </th>
+          </tr>
+          <tr>
+            <td>Defib Default to Pads</td>
+            <td>Yes</td>
+            <td contenteditable="true">Yes</td>
+          </tr>
+          <tr>
+            <td>Basic Auto Energy Escalation</td>
+            <td>Yes</td>
+            <td contenteditable="true">Yes</td>
+          </tr>
+          <tr>
+            <td>Retain Sync After Defib</td>
+            <td>No</td>
+            <td contenteditable="true">No</td>
+          </tr>
+          <tr>
+            <td>Defib Hold Ready Time</td>
+            <td>60 sec</td>
+            <td contenteditable="true">60 sec</td>
+          </tr>
+          <tr>
+            <td>Enable Remote Sync</td>
+            <td>No</td>
+            <td contenteditable="true">No</td>
+          </tr>
+          <tr>
+            <td>Highlight Sync On/Off Softkey</td>
+            <td>Yes</td>
+            <td contenteditable="true">Yes</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="table-section">
+        <h2>ADVISORY DEFIB SETTINGS</h2>
+        <table>
+          <tr>
+            <th>Configuration Item</th>
+            <th>Default Value</th>
+            <th class="editable-header" contenteditable="true">
+              ZOLL Team Rec's
+            </th>
+          </tr>
+          <tr>
+            <td>Energy Level: Shock 1</td>
+            <td>120 J</td>
+            <td contenteditable="true">120 J</td>
+          </tr>
+          <tr>
+            <td>Energy Level: Shock 2</td>
+            <td>150 J</td>
+            <td contenteditable="true">150 J</td>
+          </tr>
+          <tr>
+            <td>Energy Level: Shock 3</td>
+            <td>200 J</td>
+            <td contenteditable="true">200 J</td>
+          </tr>
+          <tr>
+            <td>Ped Energy Level: Shock 1</td>
+            <td>50 J</td>
+            <td contenteditable="true">50 J</td>
+          </tr>
+          <tr>
+            <td>Ped Energy Level: Shock 2</td>
+            <td>70 J</td>
+            <td contenteditable="true">70 J</td>
+          </tr>
+          <tr>
+            <td>Ped Energy Level: Shock 3</td>
+            <td>85 J</td>
+            <td contenteditable="true">85 J</td>
+          </tr>
+          <tr>
+            <td>Auto Analyze</td>
+            <td>Yes</td>
+            <td contenteditable="true">Yes</td>
+          </tr>
+          <tr>
+            <td>Enable Check Pulse Prompt</td>
+            <td>No</td>
+            <td contenteditable="true">No</td>
+          </tr>
+          <tr>
+            <td>Check Patient Prompt</td>
+            <td>Check Patient</td>
+            <td contenteditable="true">Check Patient</td>
+          </tr>
+          <tr>
+            <td>Auto Charge in Advisory Mode</td>
+            <td>Yes</td>
+            <td contenteditable="true">Yes</td>
+          </tr>
+          <tr>
+            <td>Enable Voice in Advisory Mode</td>
+            <td>Yes</td>
+            <td contenteditable="true">No</td>
+          </tr>
+          <tr>
+            <td>Display "Do CPR" Message</td>
+            <td>Yes</td>
+            <td contenteditable="true">Yes</td>
+          </tr>
+          <tr>
+            <td>CPR Msg After "No Shock Adv."</td>
+            <td>Perform CPR</td>
+            <td contenteditable="true">Perform CPR</td>
+          </tr>
+          <tr>
+            <td>CPR Message After Shock</td>
+            <td>Perform CPR</td>
+            <td contenteditable="true">Perform CPR</td>
+          </tr>
+          <tr>
+            <td>Stacked Shocks</td>
+            <td>1</td>
+            <td contenteditable="true">1</td>
+          </tr>
+          <tr>
+            <td>Restart Analysis After CPR</td>
+            <td>No</td>
+            <td contenteditable="true">No</td>
+          </tr>
+          <tr>
+            <td>CPR Interval</td>
+            <td>2 Minutes</td>
+            <td contenteditable="true">2 Minutes</td>
+          </tr>
+          <tr>
+            <td>Stop CPR Prompt</td>
+            <td>None</td>
+            <td contenteditable="true">AED Only</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="table-section">
+        <h2>CPR SETTINGS</h2>
+        <table>
+          <tr>
+            <th>Configuration Item</th>
+            <th>Default Value</th>
+            <th class="editable-header" contenteditable="true">
+              ZOLL Team Rec's
+            </th>
+          </tr>
+          <tr>
+            <td>Enable CPR Voice Prompts</td>
+            <td>Yes</td>
+            <td contenteditable="true">Yes</td>
+          </tr>
+          <tr>
+            <td>Enable CPR Display</td>
+            <td>Yes</td>
+            <td contenteditable="true">No</td>
+          </tr>
+          <tr>
+            <td>Enable CPR Dashboard</td>
+            <td>Yes</td>
+            <td contenteditable="true">No</td>
+          </tr>
+          <tr>
+            <td>Display Release Bar</td>
+            <td>Yes</td>
+            <td contenteditable="true">Yes</td>
+          </tr>
+          <tr>
+            <td>Enable CPR Metronome</td>
+            <td>Yes</td>
+            <td contenteditable="true">Yes</td>
+          </tr>
+          <tr>
+            <td>Target CPR Depth</td>
+            <td>2.0 inches</td>
+            <td contenteditable="true">2.0 inches</td>
+          </tr>
+          <tr>
+            <td>CPR Depth Units</td>
+            <td>inches</td>
+            <td contenteditable="true">inches</td>
+          </tr>
+          <tr>
+            <td>Display "Fully Release" Prompt</td>
+            <td>No</td>
+            <td contenteditable="true">No</td>
+          </tr>
+          <tr>
+            <td>Display Filtered ECG as Top Trace</td>
+            <td>No</td>
+            <td contenteditable="true">No</td>
+          </tr>
+          <tr>
+            <td>Metronome Tone</td>
+            <td>Standard</td>
+            <td contenteditable="true">Alternate 1</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="table-section">
+        <h2>PACE SETTINGS</h2>
+        <table>
+          <tr>
+            <th>Configuration Item</th>
+            <th>Default Value</th>
+            <th class="editable-header" contenteditable="true">
+              ZOLL Team Rec's
+            </th>
+          </tr>
+          <tr>
+            <td>Pace Rate Setting on Power-Up</td>
+            <td>70 ppm</td>
+            <td contenteditable="true">70 ppm</td>
+          </tr>
+          <tr>
+            <td>Async/Fixed Softkey in Pace Mode</td>
+            <td>Yes</td>
+            <td contenteditable="true">Yes</td>
+          </tr>
+          <tr>
+            <td>Async or Fixed Pace Labels</td>
+            <td>Async</td>
+            <td contenteditable="true">Fixed</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="table-section">
+        <h2>ALARMS SETTINGS</h2>
+        <table>
+          <tr>
+            <th>Configuration Item</th>
+            <th>Default Value</th>
+            <th class="editable-header" contenteditable="true">
+              ZOLL Team Rec's
+            </th>
+          </tr>
+          <tr>
+            <td>Alarm Limits at Power Up</td>
+            <td>Set/Review</td>
+            <td contenteditable="true">Set/Review</td>
+          </tr>
+          <tr>
+            <td>Alarms Active at Power Up</td>
+            <td>No</td>
+            <td contenteditable="true">No</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="table-section">
+        <h2>DISPLAY SETTINGS</h2>
+        <table>
+          <tr>
+            <th>Configuration Item</th>
+            <th>Default Value</th>
+            <th class="editable-header" contenteditable="true">
+              ZOLL Team Rec's
+            </th>
+          </tr>
+          <tr>
+            <td>Display Time</td>
+            <td>Elapsed Time</td>
+            <td contenteditable="true">Elapsed Time</td>
+          </tr>
+          <tr>
+            <td>Select Trace 2 at Power Up</td>
+            <td>Filtered ECG</td>
+            <td contenteditable="true">Off</td>
+          </tr>
+          <tr>
+            <td>Select Trace 3 at Power Up</td>
+            <td>Off</td>
+            <td contenteditable="true">Off</td>
+          </tr>
+          <tr>
+            <td>ECG Color</td>
+            <td>Green</td>
+            <td contenteditable="true">Green</td>
+          </tr>
+          <tr>
+            <td>SPO2 Color</td>
+            <td>Cyan</td>
+            <td contenteditable="true">Cyan</td>
+          </tr>
+          <tr>
+            <td>CPR Color</td>
+            <td>Purple</td>
+            <td contenteditable="true">Purple</td>
+          </tr>
+          <tr>
+            <td>EtCO2 Color</td>
+            <td>Yellow</td>
+            <td contenteditable="true">Yellow</td>
+          </tr>
+          <tr>
+            <td>NIBP Color</td>
+            <td>White</td>
+            <td contenteditable="true">White</td>
+          </tr>
+          <tr>
+            <td>SPO2 at Power Up</td>
+            <td>Yes</td>
+            <td contenteditable="true">Yes</td>
+          </tr>
+          <tr>
+            <td>Display Shock Count in Manual Mode</td>
+            <td>No</td>
+            <td contenteditable="true">Yes</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="table-section">
+        <h2>PRINTER & REPORT SETTINGS</h2>
+        <table>
+          <tr>
+            <th>Configuration Item</th>
+            <th>Default Value</th>
+            <th class="editable-header" contenteditable="true">
+              ZOLL Team Rec's
+            </th>
+          </tr>
+          <tr>
+            <td>Set Report Restart Delays</td>
+            <td>6 Hours</td>
+            <td contenteditable="true">6 Hours</td>
+          </tr>
+          <tr>
+            <td>Auto Generate Strips</td>
+            <td>Yes</td>
+            <td contenteditable="true">Yes</td>
+          </tr>
+          <tr>
+            <td>Print 3 Leads When Leads Sel.</td>
+            <td>No</td>
+            <td contenteditable="true">No</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="table-section">
+        <h2>READINESS TEST SETTINGS</h2>
+        <table>
+          <tr>
+            <th>Configuration Item</th>
+            <th>Default Value</th>
+            <th class="editable-header" contenteditable="true">
+              ZOLL Team Rec's
+            </th>
+          </tr>
+          <tr>
+            <td>Automatic Readiness Test</td>
+            <td>Once a Day</td>
+            <td contenteditable="true">Once a Day</td>
+          </tr>
+          <tr>
+            <td>Readiness Test Time</td>
+            <td>12:00 A.M.</td>
+            <td contenteditable="true">12:00 A.M.</td>
+          </tr>
+          <tr>
+            <td>Print Readiness Test Results</td>
+            <td>Only If Fail</td>
+            <td contenteditable="true">Only If Fail</td>
+          </tr>
+          <tr>
+            <td>Enable Readiness Test Audible Alert</td>
+            <td>No</td>
+            <td contenteditable="true">No</td>
+          </tr>
+          <tr>
+            <td>One Step Padz Installed</td>
+            <td>CPR/MwP/Complete</td>
+            <td contenteditable="true">Base</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="table-section">
+        <h2>AED MODE SETTINGS</h2>
+        <table>
+          <tr>
+            <th>Configuration Item</th>
+            <th>Default Value</th>
+            <th class="editable-header" contenteditable="true">
+              ZOLL Team Rec's
+            </th>
+          </tr>
+          <tr>
+            <td>Display ECG in AED Mode</td>
+            <td>Yes</td>
+            <td contenteditable="true">Yes</td>
+          </tr>
+          <tr>
+            <td>Display HR in AED Mode</td>
+            <td>No</td>
+            <td contenteditable="true">No</td>
+          </tr>
+          <tr>
+            <td>Manual Confirm Enable</td>
+            <td>No</td>
+            <td contenteditable="true">No</td>
+          </tr>
+          <tr>
+            <td>Extra CPR Interval Before 1st Analysis</td>
+            <td>No</td>
+            <td contenteditable="true">No</td>
+          </tr>
+          <tr>
+            <td>Duration of Extra CPR Interval</td>
+            <td>2 Minutes</td>
+            <td contenteditable="true">2 Minutes</td>
+          </tr>
+          <tr>
+            <td>Display Remaining CPR Timer</td>
+            <td>Yes</td>
+            <td contenteditable="true">Yes</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="table-section">
+        <h2>NIBP SETTINGS</h2>
+        <table>
+          <tr>
+            <th>Configuration Item</th>
+            <th>Default Value</th>
+            <th class="editable-header" contenteditable="true">
+              ZOLL Team Rec's
+            </th>
+          </tr>
+          <tr>
+            <td>Blood Pressure Units</td>
+            <td>mmHg</td>
+            <td contenteditable="true">mmHg</td>
+          </tr>
+          <tr>
+            <td>Trigger NIBP Meas on BP Alarm</td>
+            <td>Yes</td>
+            <td contenteditable="true">Yes</td>
+          </tr>
+          <tr>
+            <td>Trigger NIBP Meas on HR Alarm</td>
+            <td>No</td>
+            <td contenteditable="true">No</td>
+          </tr>
+          <tr>
+            <td>NIBP Auto Interval Default</td>
+            <td>5 Min</td>
+            <td contenteditable="true">5 Min</td>
+          </tr>
+          <tr>
+            <td>Adult Initial Cuff Inflation</td>
+            <td>160 mmHg</td>
+            <td contenteditable="true">160 mmHg</td>
+          </tr>
+          <tr>
+            <td>Pediatric Initial Cuff Inflation</td>
+            <td>120 mmHg</td>
+            <td contenteditable="true">120 mmHg</td>
+          </tr>
+          <tr>
+            <td>Neonatal Initial Cuff Inflation</td>
+            <td>90 mmHg</td>
+            <td contenteditable="true">90 mmHg</td>
+          </tr>
+          <tr>
+            <td>NIBP Patient Mode at Power Up</td>
+            <td>Adult</td>
+            <td contenteditable="true">Adult</td>
+          </tr>
+          <tr>
+            <td>NIBP Button Press & Hold</td>
+            <td>Auto</td>
+            <td contenteditable="true">Auto</td>
+          </tr>
+          <tr>
+            <td>Enable Motion Tolerance</td>
+            <td>Yes</td>
+            <td contenteditable="true">Yes</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="table-section">
+        <h2>ETCO2 SETTINGS</h2>
+        <table>
+          <tr>
+            <th>Configuration Item</th>
+            <th>Default Value</th>
+            <th class="editable-header" contenteditable="true">
+              ZOLL Team Rec's
+            </th>
+          </tr>
+          <tr>
+            <td>DEFAULT ETCO2 UNITS</td>
+            <td>mmHg</td>
+            <td contenteditable="true">mmHg</td>
+          </tr>
+          <tr>
+            <td>DISPLAYED ZOOM LEVEL</td>
+            <td>0-50</td>
+            <td contenteditable="true">0-50</td>
+          </tr>
+          <tr>
+            <td>DEFAULT ETCO2 COMP SETTING</td>
+            <td>None</td>
+            <td contenteditable="true">O2</td>
+          </tr>
+          <tr>
+            <td>POWER SAVE MODE AT POWER UP</td>
+            <td>No</td>
+            <td contenteditable="true">No</td>
+          </tr>
+          <tr>
+            <td>ETCO2 AVERAGE ON POWER UP</td>
+            <td>10 secs</td>
+            <td contenteditable="true">10 secs</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+    <script type="text/javascript">
+      var gk_isXlsx = false;
+      var gk_xlsxFileLookup = {};
+      var gk_fileData = {};
+      function filledCell(cell) {
+        return cell !== "" && cell != null;
+      }
+      function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+          try {
+            var workbook = XLSX.read(gk_fileData[filename], { type: "base64" });
+            var firstSheetName = workbook.SheetNames[0];
+            var worksheet = workbook.Sheets[firstSheetName];
+
+            // Convert sheet to JSON to filter blank rows
+            var jsonData = XLSX.utils.sheet_to_json(worksheet, {
+              header: 1,
+              blankrows: false,
+              defval: "",
+            });
+            // Filter out blank rows (rows where all cells are empty, null, or undefined)
+            var filteredData = jsonData.filter((row) => row.some(filledCell));
+
+            // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+            var headerRowIndex = filteredData.findIndex(
+              (row, index) =>
+                row.filter(filledCell).length >=
+                filteredData[index + 1]?.filter(filledCell).length
+            );
+            // Fallback
+            if (headerRowIndex === -1 || headerRowIndex > 25) {
+              headerRowIndex = 0;
+            }
+
+            // Convert filtered JSON back to CSV
+            var csv = XLSX.utils.aoa_to_sheet(
+              filteredData.slice(headerRowIndex)
+            ); // Create a new sheet from filtered array of arrays
+            csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+            return csv;
+          } catch (e) {
+            console.error(e);
+            return "";
+          }
+        }
+        return gk_fileData[filename] || "";
+      }
+
+      function highlightDiffRows() {
+        const tables = document.querySelectorAll("table");
+        tables.forEach((table) => {
+          const rows = table.querySelectorAll("tr");
+          rows.forEach((row, index) => {
+            if (index === 0) return; // Skip header row
+            const defaultCell = row.cells[1]; // Default Value
+            const recCell = row.cells[2]; // ZOLL Team Rec's
+            if (defaultCell && recCell) {
+              const defaultValue = defaultCell.textContent.trim();
+              const recValue = recCell.textContent.trim();
+              if (defaultValue !== recValue) {
+                row.classList.add("diff-row");
+                recCell.classList.add("diff-cell");
+              } else {
+                row.classList.remove("diff-row");
+                recCell.classList.remove("diff-cell");
+              }
+            }
+          });
+        });
+      }
+
+      // Function to propagate header edit
+      document.querySelectorAll(".editable-header").forEach((header) => {
+        header.addEventListener("input", (e) => {
+          const newText = e.target.textContent;
+          document
+            .querySelectorAll(".editable-header")
+            .forEach((otherHeader) => {
+              otherHeader.textContent = newText;
+            });
+          highlightDiffRows();
+        });
+      });
+
+      // Run on page load
+      document.addEventListener("DOMContentLoaded", highlightDiffRows);
+
+      // Update on content change
+      document
+        .querySelectorAll('td[contenteditable="true"]')
+        .forEach((cell) => {
+          cell.addEventListener("input", highlightDiffRows);
+        });
+
+      console.log("OneStep Config Manual loaded");
+    </script>
+  </body>
+</html>
