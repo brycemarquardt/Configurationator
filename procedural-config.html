@@ -44,52 +44,6 @@
     return gk_fileData[filename] || "";
   }
 </script>
-<script type="text/javascript">
-  var gk_isXlsx = false;
-  var gk_xlsxFileLookup = {};
-  var gk_fileData = {};
-  function filledCell(cell) {
-    return cell !== "" && cell != null;
-  }
-  function loadFileData(filename) {
-    if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-      try {
-        var workbook = XLSX.read(gk_fileData[filename], { type: "base64" });
-        var firstSheetName = workbook.SheetNames[0];
-        var worksheet = workbook.Sheets[firstSheetName];
-
-        // Convert sheet to JSON to filter blank rows
-        var jsonData = XLSX.utils.sheet_to_json(worksheet, {
-          header: 1,
-          blankrows: false,
-          defval: "",
-        });
-        // Filter out blank rows (rows where all cells are empty, null, or undefined)
-        var filteredData = jsonData.filter((row) => row.some(filledCell));
-
-        // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-        var headerRowIndex = filteredData.findIndex(
-          (row, index) =>
-            row.filter(filledCell).length >=
-            filteredData[index + 1]?.filter(filledCell).length
-        );
-        // Fallback
-        if (headerRowIndex === -1 || headerRowIndex > 25) {
-          headerRowIndex = 0;
-        }
-
-        // Convert filtered JSON back to CSV
-        var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-        csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-        return csv;
-      } catch (e) {
-        console.error(e);
-        return "";
-      }
-    }
-    return gk_fileData[filename] || "";
-  }
-</script>
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -100,6 +54,8 @@
       href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;700&display=swap"
       rel="stylesheet"
     />
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
       body {
         font-family: "Open Sans", Arial, sans-serif;
@@ -107,21 +63,27 @@
         padding: 20px;
         background-color: #f4f4f4;
       }
+
       .container {
         max-width: 1400px;
         margin: 0 auto;
+        padding-top: 100px; /* Increased to prevent content overlap with fixed buttons */
       }
+
       .logo {
         max-width: 200px;
         width: 100%;
-        margin: 0 auto 40px;
+        margin: 30px auto 40px;
         display: block;
+        background: transparent;
       }
+
       h1 {
         color: #333;
         text-align: center;
         padding-bottom: 20px;
       }
+
       .sub-title {
         display: block;
         text-align: center;
@@ -135,13 +97,15 @@
         max-width: 1100px;
         margin: 15px auto 60px auto;
       }
+
       h2 {
         color: #333;
         margin-top: 2px;
-        margin-left: 0; /* Align with table's left edge */
+        margin-left: 0;
       }
+
       table {
-        width: 100%; /* Fill table-section width */
+        width: 100%;
         max-width: 1100px;
         border-collapse: separate;
         border-spacing: 0;
@@ -152,6 +116,7 @@
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
         overflow: hidden;
       }
+
       th,
       td {
         padding: 12px 15px;
@@ -161,19 +126,23 @@
         text-overflow: ellipsis;
         white-space: nowrap;
       }
+
       th {
         background: linear-gradient(to bottom, #0765cd, #054a9a);
         color: white;
         font-weight: bold;
         font-size: 20px;
       }
+
       td {
         font-size: 18px;
       }
+
       th:nth-child(1),
       td:nth-child(1) {
         width: 40%;
       }
+
       th:nth-child(2),
       td:nth-child(2),
       th:nth-child(3),
@@ -181,53 +150,371 @@
         width: 30%;
         text-align: center;
       }
+
       th.editable-header {
         cursor: text;
       }
+
       tr:nth-child(even) {
         background-color: #f9f9f9;
       }
+
       tr:hover {
         background-color: #f0f4f8;
       }
-      .button-container {
-        display: flex;
-        justify-content: center;
-        gap: 10px;
-        margin-bottom: 10px;
-        padding-bottom: 20px;
+
+      /* Highlighting style for differing values */
+      .table-section tr.diff-row {
+        background-color: #ffe6e6; /* Light red background for rows, increased specificity */
       }
+
+      .button-row {
+        position: fixed;
+        top: 20px;
+        left: 0;
+        width: 100%;
+        max-width: 1400px; /* Match container width to prevent overflow */
+        margin: 0 auto; /* Center within viewport */
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 40px;
+        background-color: transparent;
+        z-index: 1000;
+      }
+
+      .button-container-left,
+      .button-container-right {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .button-container-left {
+        margin-left: 20px; /* Symmetric with button-container-right */
+      }
+
+      .button-container-right {
+        margin-right: 20px; /* Shift buttons leftward */
+      }
+
       .manual-button {
-        display: inline-block;
-        padding: 10px 20px;
-        font-size: 16px;
-        color: white;
-        background-color: #0765cd;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 12px 24px;
+        font-size: 18px;
+        font-weight: bold;
+        color: #0675cd;
+        background-color: white;
         border: none;
         border-radius: 5px;
         cursor: pointer;
         text-decoration: none;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        min-width: 120px;
+        min-height: 44px;
+        text-align: center;
+        margin: 5px;
       }
+
       .manual-button:hover {
+        background-color: #f0f4f8;
+      }
+
+      .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        overflow-y: auto;
+      }
+
+      .modal-content {
+        background-color: white;
+        margin: 5% auto;
+        padding: 20px;
+        border-radius: 10px;
+        width: 90%;
+        max-width: 600px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      }
+
+      .preview-container img {
+        max-width: 100%;
+        max-height: 250px;
+        height: auto;
+        display: block;
+        margin: 0 auto;
+      }
+
+      .filename-input {
+        padding: 12px;
+        border: 2px solid #e0e0e0;
+        border-radius: 5px;
+        font-size: 16px;
+        box-sizing: border-box;
+        width: 100%; /* Widen input box to full parent width */
+      }
+
+      .filename-input:focus {
+        outline: none;
+        border-color: #0765cd;
+        box-shadow: 0 0 0 2px rgba(7, 101, 205, 0.2);
+      }
+
+      .preview-section {
+        margin-top: 20px;
+      }
+
+      .preview-section p {
+        margin-bottom: 10px;
+        color: #666;
+        font-size: 14px;
+      }
+
+      .preview-container {
+        text-align: center;
+        border: 1px solid #e0e0e0;
+        border-radius: 5px;
+        padding: 10px;
+        background-color: #f9f9f9;
+      }
+
+      .modal-footer {
+        padding: 20px;
+        border-top: 1px solid #e0e0e0;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        border-radius: 0 0 10px 10px;
+      }
+
+      .modal-btn {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: bold;
+        transition: background-color: 0.3s;
+      }
+
+      .cancel-btn {
+        background-color: #f0f0f0;
+        color: #666;
+        border: 1px solid #ddd;
+      }
+
+      .cancel-btn:hover {
+        background-color: #e0e0e0;
+      }
+
+      .save-btn {
+        background-color: #0765cd;
+        color: white;
+      }
+
+      .save-btn:hover {
         background-color: #054a9a;
       }
-      td[contenteditable="true"] {
-        background-color: #e6f0ff;
-        cursor: text;
+
+      /* Tablet and smaller */
+      @media (max-width: 768px) {
+        .button-row {
+          position: static;
+          flex-direction: column;
+          align-items: stretch;
+          padding: 10px;
+          max-width: none; /* Remove max-width on smaller screens */
+          margin: 0;
+          background-color: transparent;
+        }
+
+        .button-container-left,
+        .button-container-right {
+          justify-content: center;
+        }
+
+        .button-container-left {
+          margin-left: 0; /* Remove margin-left on smaller screens */
+        }
+
+        .button-container-right {
+          margin-right: 0; /* Remove margin-right on smaller screens */
+        }
+
+        .manual-button {
+          padding: 12px 16px;
+          font-size: 14px;
+          min-width: 100px;
+        }
+
+        .container {
+          padding: 10px;
+        }
+
+        .table-section {
+          margin: 10px 0;
+        }
+
+        table {
+          font-size: 16px;
+          overflow-x: auto;
+          display: block;
+          white-space: nowrap;
+        }
+
+        th,
+        td {
+          padding: 10px 12px;
+          line-height: 1.4;
+        }
+
+        h1 {
+          font-size: 26px;
+        }
+
+        .sub-title {
+          font-size: 22px;
+        }
+
+        .logo {
+          max-width: 120px;
+          margin: 15px auto;
+        }
       }
-      td[contenteditable="true"]:hover {
-        background-color: #d1e4ff;
+
+      /* Mobile (small screens and tablets) */
+      @media (max-width: 600px) {
+        table {
+          display: block;
+          overflow-x: auto;
+        }
+
+        thead {
+          display: none;
+        }
+
+        tr {
+          display: block;
+          margin-bottom: 15px;
+          border-bottom: 1px solid #ddd;
+          padding-bottom: 10px;
+        }
+
+        td {
+          display: block;
+          text-align: left;
+          padding: 8px 12px;
+          font-size: 14px;
+          border: none;
+          position: relative;
+          white-space: normal;
+        }
+
+        td:nth-child(1)::before {
+          content: "Configuration Item: ";
+          font-weight: bold;
+          display: block;
+          margin-bottom: 5px;
+          color: #333;
+        }
+
+        td:nth-child(2)::before {
+          content: "Default Value: ";
+          font-weight: bold;
+          display: block;
+          margin-bottom: 5px;
+          color: #333;
+        }
+
+        td:nth-child(3)::before {
+          content: "ZOLL Team Rec's: ";
+          font-weight: bold;
+          display: block;
+          margin-bottom: 5px;
+          color: #333;
+        }
+
+        th:nth-child(1),
+        td:nth-child(1),
+        th:nth-child(2),
+        td:nth-child(2),
+        th:nth-child(3),
+        td:nth-child(3) {
+          width: auto;
+        }
+
+        td[contenteditable="true"] {
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          padding: 8px;
+        }
+
+        .table-section {
+          margin: 15px auto 60px auto;
+        }
       }
-      .diff-row td {
-        background-color: #ffe6e6;
+
+      /* Small mobile screens */
+      @media (max-width: 480px) {
+        .manual-button {
+          width: calc(50% - 10px);
+          padding: 12px 10px;
+          font-size: 12px;
+          min-width: 80px;
+        }
+
+        h1 {
+          font-size: 22px;
+        }
+
+        .sub-title {
+          font-size: 20px;
+        }
+
+        th,
+        td {
+          padding: 8px 10px;
+          font-size: 14px;
+          line-height: 1.4;
+        }
+
+        .modal-content {
+          width: 95%;
+          margin: 10px auto;
+          padding: 10px;
+        }
+
+        .modal-body {
+          padding: 10px;
+        }
+
+        .preview-container img {
+          max-height: 200px;
+        }
+
+        .modal-btn {
+          padding: 10px 20px;
+          font-size: 14px;
+        }
+
+        .logo {
+          max-width: 120px;
+          margin: 15px auto;
+        }
       }
-      .diff-cell {
-        background-color: #ffe6e6 !important;
-      }
+
       @media print {
         .logo,
-        .button-container,
-        .manual-button {
+        .button-row,
+        .manual-button,
+        .modal {
           display: none;
         }
         .sub-title,
@@ -243,6 +530,7 @@
         .container {
           max-width: 100%;
           margin: 0;
+          padding: 0;
         }
         .table-section {
           max-width: 100%;
@@ -255,18 +543,72 @@
     </style>
   </head>
   <body>
+    <div class="button-row">
+      <div class="button-container-left">
+        <button class="manual-button back-home-btn">Back<br />Home</button>
+        <button class="manual-button reset-tables-btn">
+          Reset<br />Tables
+        </button>
+      </div>
+      <div class="button-container-right">
+        <button class="manual-button screenshot-btn">
+          Take<br />Screenshot!
+        </button>
+        <button class="manual-button export-pdf-btn">Export<br />as PDF</button>
+      </div>
+    </div>
+
+    <!-- Modal Dialog for PDF Save -->
+    <div id="pdfModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Save Configuration Report</h3>
+        </div>
+        <div class="modal-body">
+          <div class="filename-section">
+            <label for="filenameInput">Filename:</label>
+            <input type="text" id="filenameInput" class="filename-input" />
+          </div>
+          <div class="preview-section">
+            <p>Preview of captured configuration:</p>
+            <div class="preview-container">
+              <img
+                id="previewImage"
+                src=""
+                alt="Configuration Preview"
+                style="
+                  max-width: 100%;
+                  max-height: 300px;
+                  border: 1px solid #ddd;
+                "
+              />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="cancelBtn" class="modal-btn cancel-btn">Cancel</button>
+          <button id="saveBtn" class="modal-btn save-btn">Save PDF</button>
+        </div>
+      </div>
+    </div>
+
     <div class="container">
-      <img src="logo-ce.png" alt="ZOLL Clinical Education Logo" class="logo" />
+      <img src="logo-ce.png" alt="ZOLL Configurationator Logo" class="logo" />
       <h1>ZOLL R Series Config MCU 20 - Procedural Defibs Only!</h1>
       <span class="sub-title" contenteditable="true">Hospital XYZ</span>
 
       <div class="table-section">
-        <h2>GENERAL SETTINGS</h2>
-        <table>
+        <h2 id="general-settings">GENERAL SETTINGS</h2>
+        <table aria-labelledby="general-settings">
           <tr>
-            <th>Configuration Item</th>
-            <th>Default Value</th>
-            <th class="editable-header" contenteditable="true">
+            <th scope="col">Configuration Item</th>
+            <th scope="col">Default Value</th>
+            <th
+              scope="col"
+              class="editable-header"
+              contenteditable="true"
+              aria-label="ZOLL Team Recommendations"
+            >
               ZOLL Team Rec's
             </th>
           </tr>
@@ -289,12 +631,17 @@
       </div>
 
       <div class="table-section">
-        <h2>ECG SETTINGS</h2>
-        <table>
+        <h2 id="ecg-settings">ECG SETTINGS</h2>
+        <table aria-labelledby="ecg-settings">
           <tr>
-            <th>Configuration Item</th>
-            <th>Default Value</th>
-            <th class="editable-header" contenteditable="true">
+            <th scope="col">Configuration Item</th>
+            <th scope="col">Default Value</th>
+            <th
+              scope="col"
+              class="editable-header"
+              contenteditable="true"
+              aria-label="ZOLL Team Recommendations"
+            >
               ZOLL Team Rec's
             </th>
           </tr>
@@ -337,12 +684,17 @@
       </div>
 
       <div class="table-section">
-        <h2>AUDIO SETTINGS</h2>
-        <table>
+        <h2 id="audio-settings">AUDIO SETTINGS</h2>
+        <table aria-labelledby="audio-settings">
           <tr>
-            <th>Configuration Item</th>
-            <th>Default Value</th>
-            <th class="editable-header" contenteditable="true">
+            <th scope="col">Configuration Item</th>
+            <th scope="col">Default Value</th>
+            <th
+              scope="col"
+              class="editable-header"
+              contenteditable="true"
+              aria-label="ZOLL Team Recommendations"
+            >
               ZOLL Team Rec's
             </th>
           </tr>
@@ -375,12 +727,17 @@
       </div>
 
       <div class="table-section">
-        <h2>BASIC DEFIB SETTINGS</h2>
-        <table>
+        <h2 id="basic-defib-settings">BASIC DEFIB SETTINGS</h2>
+        <table aria-labelledby="basic-defib-settings">
           <tr>
-            <th>Configuration Item</th>
-            <th>Default Value</th>
-            <th class="editable-header" contenteditable="true">
+            <th scope="col">Configuration Item</th>
+            <th scope="col">Default Value</th>
+            <th
+              scope="col"
+              class="editable-header"
+              contenteditable="true"
+              aria-label="ZOLL Team Recommendations"
+            >
               ZOLL Team Rec's
             </th>
           </tr>
@@ -418,12 +775,17 @@
       </div>
 
       <div class="table-section">
-        <h2>ADVISORY DEFIB SETTINGS</h2>
-        <table>
+        <h2 id="advisory-defib-settings">ADVISORY DEFIB SETTINGS</h2>
+        <table aria-labelledby="advisory-defib-settings">
           <tr>
-            <th>Configuration Item</th>
-            <th>Default Value</th>
-            <th class="editable-header" contenteditable="true">
+            <th scope="col">Configuration Item</th>
+            <th scope="col">Default Value</th>
+            <th
+              scope="col"
+              class="editable-header"
+              contenteditable="true"
+              aria-label="ZOLL Team Recommendations"
+            >
               ZOLL Team Rec's
             </th>
           </tr>
@@ -521,12 +883,17 @@
       </div>
 
       <div class="table-section">
-        <h2>CPR SETTINGS</h2>
-        <table>
+        <h2 id="cpr-settings">CPR SETTINGS</h2>
+        <table aria-labelledby="cpr-settings">
           <tr>
-            <th>Configuration Item</th>
-            <th>Default Value</th>
-            <th class="editable-header" contenteditable="true">
+            <th scope="col">Configuration Item</th>
+            <th scope="col">Default Value</th>
+            <th
+              scope="col"
+              class="editable-header"
+              contenteditable="true"
+              aria-label="ZOLL Team Recommendations"
+            >
               ZOLL Team Rec's
             </th>
           </tr>
@@ -584,12 +951,17 @@
       </div>
 
       <div class="table-section">
-        <h2>PACE SETTINGS</h2>
-        <table>
+        <h2 id="pace-settings">PACE SETTINGS</h2>
+        <table aria-labelledby="pace-settings">
           <tr>
-            <th>Configuration Item</th>
-            <th>Default Value</th>
-            <th class="editable-header" contenteditable="true">
+            <th scope="col">Configuration Item</th>
+            <th scope="col">Default Value</th>
+            <th
+              scope="col"
+              class="editable-header"
+              contenteditable="true"
+              aria-label="ZOLL Team Recommendations"
+            >
               ZOLL Team Rec's
             </th>
           </tr>
@@ -612,12 +984,17 @@
       </div>
 
       <div class="table-section">
-        <h2>ALARMS SETTINGS</h2>
-        <table>
+        <h2 id="alarms-settings">ALARMS SETTINGS</h2>
+        <table aria-labelledby="alarms-settings">
           <tr>
-            <th>Configuration Item</th>
-            <th>Default Value</th>
-            <th class="editable-header" contenteditable="true">
+            <th scope="col">Configuration Item</th>
+            <th scope="col">Default Value</th>
+            <th
+              scope="col"
+              class="editable-header"
+              contenteditable="true"
+              aria-label="ZOLL Team Recommendations"
+            >
               ZOLL Team Rec's
             </th>
           </tr>
@@ -635,12 +1012,17 @@
       </div>
 
       <div class="table-section">
-        <h2>DISPLAY SETTINGS</h2>
-        <table>
+        <h2 id="display-settings">DISPLAY SETTINGS</h2>
+        <table aria-labelledby="display-settings">
           <tr>
-            <th>Configuration Item</th>
-            <th>Default Value</th>
-            <th class="editable-header" contenteditable="true">
+            <th scope="col">Configuration Item</th>
+            <th scope="col">Default Value</th>
+            <th
+              scope="col"
+              class="editable-header"
+              contenteditable="true"
+              aria-label="ZOLL Team Recommendations"
+            >
               ZOLL Team Rec's
             </th>
           </tr>
@@ -698,12 +1080,17 @@
       </div>
 
       <div class="table-section">
-        <h2>PRINTER & REPORT SETTINGS</h2>
-        <table>
+        <h2 id="printer-report-settings">PRINTER & REPORT SETTINGS</h2>
+        <table aria-labelledby="printer-report-settings">
           <tr>
-            <th>Configuration Item</th>
-            <th>Default Value</th>
-            <th class="editable-header" contenteditable="true">
+            <th scope="col">Configuration Item</th>
+            <th scope="col">Default Value</th>
+            <th
+              scope="col"
+              class="editable-header"
+              contenteditable="true"
+              aria-label="ZOLL Team Recommendations"
+            >
               ZOLL Team Rec's
             </th>
           </tr>
@@ -726,12 +1113,17 @@
       </div>
 
       <div class="table-section">
-        <h2>READINESS TEST SETTINGS</h2>
-        <table>
+        <h2 id="readiness-test-settings">READINESS TEST SETTINGS</h2>
+        <table aria-labelledby="readiness-test-settings">
           <tr>
-            <th>Configuration Item</th>
-            <th>Default Value</th>
-            <th class="editable-header" contenteditable="true">
+            <th scope="col">Configuration Item</th>
+            <th scope="col">Default Value</th>
+            <th
+              scope="col"
+              class="editable-header"
+              contenteditable="true"
+              aria-label="ZOLL Team Recommendations"
+            >
               ZOLL Team Rec's
             </th>
           </tr>
@@ -764,12 +1156,17 @@
       </div>
 
       <div class="table-section">
-        <h2>AED MODE SETTINGS</h2>
-        <table>
+        <h2 id="aed-mode-settings">AED MODE SETTINGS</h2>
+        <table aria-labelledby="aed-mode-settings">
           <tr>
-            <th>Configuration Item</th>
-            <th>Default Value</th>
-            <th class="editable-header" contenteditable="true">
+            <th scope="col">Configuration Item</th>
+            <th scope="col">Default Value</th>
+            <th
+              scope="col"
+              class="editable-header"
+              contenteditable="true"
+              aria-label="ZOLL Team Recommendations"
+            >
               ZOLL Team Rec's
             </th>
           </tr>
@@ -807,12 +1204,17 @@
       </div>
 
       <div class="table-section">
-        <h2>NIBP SETTINGS</h2>
-        <table>
+        <h2 id="nibp-settings">NIBP SETTINGS</h2>
+        <table aria-labelledby="nibp-settings">
           <tr>
-            <th>Configuration Item</th>
-            <th>Default Value</th>
-            <th class="editable-header" contenteditable="true">
+            <th scope="col">Configuration Item</th>
+            <th scope="col">Default Value</th>
+            <th
+              scope="col"
+              class="editable-header"
+              contenteditable="true"
+              aria-label="ZOLL Team Recommendations"
+            >
               ZOLL Team Rec's
             </th>
           </tr>
@@ -870,12 +1272,17 @@
       </div>
 
       <div class="table-section">
-        <h2>ETCO2 SETTINGS</h2>
-        <table>
+        <h2 id="etco2-settings">ETCO2 SETTINGS</h2>
+        <table aria-labelledby="etco2-settings">
           <tr>
-            <th>Configuration Item</th>
-            <th>Default Value</th>
-            <th class="editable-header" contenteditable="true">
+            <th scope="col">Configuration Item</th>
+            <th scope="col">Default Value</th>
+            <th
+              scope="col"
+              class="editable-header"
+              contenteditable="true"
+              aria-label="ZOLL Team Recommendations"
+            >
               ZOLL Team Rec's
             </th>
           </tr>
@@ -907,6 +1314,7 @@
         </table>
       </div>
     </div>
+
     <script type="text/javascript">
       var gk_isXlsx = false;
       var gk_xlsxFileLookup = {};
@@ -957,7 +1365,7 @@
 
       function highlightDiffRows() {
         const tables = document.querySelectorAll("table");
-        tables.forEach((table) => {
+        tables.forEach((table, tableIndex) => {
           const rows = table.querySelectorAll("tr");
           rows.forEach((row, index) => {
             if (index === 0) return; // Skip header row
@@ -968,11 +1376,19 @@
               const recValue = recCell.textContent.trim();
               if (defaultValue !== recValue) {
                 row.classList.add("diff-row");
-                recCell.classList.add("diff-cell");
+                console.log(
+                  `Table ${tableIndex}, Row ${index}: Highlighted (Default: "${defaultValue}", Rec: "${recValue}")`
+                );
               } else {
                 row.classList.remove("diff-row");
-                recCell.classList.remove("diff-cell");
+                console.log(
+                  `Table ${tableIndex}, Row ${index}: Not highlighted (Default: "${defaultValue}", Rec: "${recValue}")`
+                );
               }
+            } else {
+              console.warn(
+                `Table ${tableIndex}, Row ${index}: Missing default or rec cell`
+              );
             }
           });
         });
@@ -999,7 +1415,320 @@
         .querySelectorAll('td[contenteditable="true"]')
         .forEach((cell) => {
           cell.addEventListener("input", highlightDiffRows);
+          cell.addEventListener("blur", highlightDiffRows);
         });
+
+      // Global variables for modal
+      let capturedCanvas = null;
+      let exportType = "pdf"; // "png" or "pdf"
+
+      // Function to generate filename from subtitle and H1
+      function generateFilename(type = "pdf") {
+        const subtitleElement = document.querySelector(".sub-title");
+        const h1Element = document.querySelector("h1");
+
+        const subtitleText = subtitleElement
+          ? subtitleElement.textContent.trim()
+          : "";
+        const h1Text = h1Element ? h1Element.textContent.trim() : "";
+
+        // Sanitize both text elements
+        const sanitizedSubtitle = subtitleText
+          .replace(/[^a-zA-Z0-9\s\-_]/g, "")
+          .replace(/\s+/g, " ")
+          .trim();
+
+        const sanitizedH1 = h1Text
+          .replace(/[^a-zA-Z0-9\s\-_]/g, "")
+          .replace(/\s+/g, " ")
+          .trim();
+
+        // Build filename based on available content
+        let baseFilename = "";
+        if (sanitizedSubtitle && sanitizedSubtitle !== "HospitalXYZ") {
+          // Use subtitle + H1 if both available
+          if (sanitizedH1) {
+            baseFilename = `${sanitizedSubtitle} - ${sanitizedH1}`;
+          } else {
+            // Use subtitle only if H1 not available
+            baseFilename = `${sanitizedSubtitle} - Config Report`;
+          }
+        } else {
+          // Fallback: use H1 if available, otherwise default
+          if (sanitizedH1) {
+            baseFilename = sanitizedH1;
+          } else {
+            baseFilename = "Config Report";
+          }
+        }
+
+        // Add appropriate extension
+        return type === "png" ? `${baseFilename}.png` : `${baseFilename}.pdf`;
+      }
+
+      // Modal functions
+      function showModal(canvas, type = "pdf") {
+        capturedCanvas = canvas;
+        exportType = type;
+
+        const modal = document.getElementById("pdfModal");
+        const modalHeader = document.querySelector(".modal-header h3");
+        const filenameInput = document.getElementById("filenameInput");
+        const previewImage = document.getElementById("previewImage");
+        const saveBtn = document.getElementById("saveBtn");
+
+        // Update modal title and button text based on type
+        if (type === "png") {
+          modalHeader.textContent = "Save Screenshot";
+          saveBtn.textContent = "Save PNG";
+        } else {
+          modalHeader.textContent = "Save Configuration Report";
+          saveBtn.textContent = "Save PDF";
+        }
+
+        // Set filename
+        filenameInput.value = generateFilename(type);
+
+        // Set preview image
+        previewImage.src = canvas.toDataURL();
+
+        // Show modal
+        modal.style.display = "block";
+
+        // Focus on filename input
+        setTimeout(() => filenameInput.focus(), 100);
+      }
+
+      function hideModal() {
+        const modal = document.getElementById("pdfModal");
+        modal.style.display = "none";
+        capturedCanvas = null;
+        exportType = "pdf";
+      }
+
+      function saveFile() {
+        if (!capturedCanvas) return;
+
+        const filenameInput = document.getElementById("filenameInput");
+        let filename = filenameInput.value.trim();
+
+        if (exportType === "png") {
+          // Ensure .png extension
+          if (!filename.toLowerCase().endsWith(".png")) {
+            filename += ".png";
+          }
+
+          // Sanitize filename
+          filename = filename
+            .replace(/[^a-zA-Z0-9\s\-_\.]/g, "")
+            .replace(/\s+/g, " ")
+            .trim();
+          if (!filename || filename === ".png") {
+            filename = "Config Report.png";
+          }
+
+          // Download PNG
+          const link = document.createElement("a");
+          link.download = filename;
+          link.href = capturedCanvas.toDataURL();
+          link.click();
+
+          hideModal();
+        } else {
+          // PDF export
+          // Ensure .pdf extension
+          if (!filename.toLowerCase().endsWith(".pdf")) {
+            filename += ".pdf";
+          }
+
+          // Sanitize filename
+          filename = filename
+            .replace(/[^a-zA-Z0-9\s\-_\.]/g, "")
+            .replace(/\s+/g, " ")
+            .trim();
+          if (!filename || filename === ".pdf") {
+            filename = "Config Report.pdf";
+          }
+
+          try {
+            // Calculate custom dimensions for single long page
+            const customWidth = 210; // A4 width in mm
+            const customHeight =
+              (capturedCanvas.height / capturedCanvas.width) * customWidth;
+
+            // Create PDF with custom dimensions for single long page
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({
+              orientation: "portrait",
+              unit: "mm",
+              format: [customWidth, customHeight], // Custom format for single long page
+            });
+
+            // Add entire canvas to single long page (no page breaks)
+            const imgData = capturedCanvas.toDataURL("image/jpeg", 0.95);
+            pdf.addImage(imgData, "JPEG", 0, 0, customWidth, customHeight);
+
+            // Download single long PDF page
+            pdf.save(filename);
+
+            hideModal();
+          } catch (error) {
+            console.error("PDF generation failed:", error);
+            alert("Failed to generate PDF. Please try again.");
+          }
+        }
+      }
+
+      // Reset tables functionality
+      function resetTables() {
+        // Reset subtitle to default
+        const subtitleElement = document.querySelector(".sub-title");
+        if (subtitleElement) {
+          subtitleElement.textContent = "Hospital XYZ";
+        }
+
+        // Reset all editable table cells to their default values
+        const editableCells = document.querySelectorAll(
+          'td[contenteditable="true"]'
+        );
+        editableCells.forEach((cell) => {
+          // Find the corresponding default value cell (second column)
+          const row = cell.closest("tr");
+          if (row) {
+            const defaultCell = row.cells[1]; // Default Value column
+            if (defaultCell) {
+              cell.textContent = defaultCell.textContent;
+            }
+          }
+        });
+
+        // Reset editable headers
+        const editableHeaders = document.querySelectorAll(".editable-header");
+        editableHeaders.forEach((header) => {
+          header.textContent = "ZOLL Team Rec's";
+        });
+
+        // Re-run highlighting to update visual state
+        highlightDiffRows();
+
+        // Show confirmation
+        alert("All tables have been reset to default values.");
+      }
+
+      // PNG Screenshot functionality
+      function takeScreenshot() {
+        // Hide all buttons including ZOLL button for screenshots
+        const buttons = document.querySelectorAll(".manual-button");
+        buttons.forEach((btn) => (btn.style.display = "none"));
+
+        html2canvas(document.body, {
+          height: document.body.scrollHeight,
+          width: document.body.scrollWidth,
+          scrollX: 0,
+          scrollY: 0,
+          useCORS: true,
+          allowTaint: true,
+        })
+          .then(function (canvas) {
+            buttons.forEach((btn) => (btn.style.display = "inline-block"));
+            showModal(canvas, "png");
+          })
+          .catch(function (error) {
+            console.error("Screenshot failed:", error);
+            buttons.forEach((btn) => (btn.style.display = "inline-block"));
+            alert("Failed to capture screenshot. Please try again.");
+          });
+      }
+
+      // PDF Export functionality
+      function exportAsPDF() {
+        // Hide all buttons except ZOLL button for PDF export
+        const buttonsToHide = document.querySelectorAll(
+          ".back-home-btn, .reset-tables-btn, .screenshot-btn, .export-pdf-btn"
+        );
+        buttonsToHide.forEach((btn) => (btn.style.display = "none"));
+
+        html2canvas(document.body, {
+          height: document.body.scrollHeight,
+          width: document.body.scrollWidth,
+          scrollX: 0,
+          scrollY: 0,
+          useCORS: true,
+          allowTaint: true,
+        })
+          .then(function (canvas) {
+            buttonsToHide.forEach(
+              (btn) => (btn.style.display = "inline-block")
+            );
+            showModal(canvas, "pdf");
+          })
+          .catch(function (error) {
+            console.error("Screenshot failed:", error);
+            buttonsToHide.forEach(
+              (btn) => (btn.style.display = "inline-block")
+            );
+            alert("Failed to capture screenshot. Please try again.");
+          });
+      }
+
+      // Back home functionality
+      function goBackHome() {
+        window.location.href = "index.html";
+      }
+
+      // Add event listeners
+      document.addEventListener("DOMContentLoaded", function () {
+        const screenshotBtn = document.querySelector(".screenshot-btn");
+        const exportPdfBtn = document.querySelector(".export-pdf-btn");
+        const resetTablesBtn = document.querySelector(".reset-tables-btn");
+        const backHomeBtn = document.querySelector(".back-home-btn");
+        const saveBtn = document.getElementById("saveBtn");
+        const cancelBtn = document.getElementById("cancelBtn");
+        const filenameInput = document.getElementById("filenameInput");
+
+        if (screenshotBtn) {
+          screenshotBtn.addEventListener("click", takeScreenshot);
+        }
+
+        if (exportPdfBtn) {
+          exportPdfBtn.addEventListener("click", exportAsPDF);
+        }
+
+        if (resetTablesBtn) {
+          resetTablesBtn.addEventListener("click", resetTables);
+        }
+
+        if (backHomeBtn) {
+          backHomeBtn.addEventListener("click", goBackHome);
+        }
+
+        if (saveBtn) {
+          saveBtn.addEventListener("click", saveFile);
+        }
+
+        if (cancelBtn) {
+          cancelBtn.addEventListener("click", hideModal);
+        }
+
+        // Allow Enter key to save
+        if (filenameInput) {
+          filenameInput.addEventListener("keypress", function (e) {
+            if (e.key === "Enter") {
+              saveFile();
+            }
+          });
+        }
+
+        // Close modal when clicking outside
+        const modal = document.getElementById("pdfModal");
+        if (modal) {
+          modal.addEventListener("click", function (e) {
+            if (e.target === modal) {
+              hideModal();
+            }
+          });
+        }
+      });
 
       console.log("OneStep Config Manual loaded");
     </script>
