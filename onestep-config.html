@@ -1154,7 +1154,9 @@
           document
             .querySelectorAll(".editable-header")
             .forEach((otherHeader) => {
-              otherHeader.textContent = newText;
+              if (otherHeader !== e.target) {
+                otherHeader.textContent = newText;
+              }
             });
           highlightDiffRows();
         });
