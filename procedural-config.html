@@ -1,54 +1,7 @@
-<script type="text/javascript">
-  var gk_isXlsx = false;
-  var gk_xlsxFileLookup = {};
-  var gk_fileData = {};
-  function filledCell(cell) {
-    return cell !== "" && cell != null;
-  }
-  function loadFileData(filename) {
-    if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-      try {
-        var workbook = XLSX.read(gk_fileData[filename], { type: "base64" });
-        var firstSheetName = workbook.SheetNames[0];
-        var worksheet = workbook.Sheets[firstSheetName];
-
-        // Convert sheet to JSON to filter blank rows
-        var jsonData = XLSX.utils.sheet_to_json(worksheet, {
-          header: 1,
-          blankrows: false,
-          defval: "",
-        });
-        // Filter out blank rows (rows where all cells are empty, null, or undefined)
-        var filteredData = jsonData.filter((row) => row.some(filledCell));
-
-        // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-        var headerRowIndex = filteredData.findIndex(
-          (row, index) =>
-            row.filter(filledCell).length >=
-            filteredData[index + 1]?.filter(filledCell).length
-        );
-        // Fallback
-        if (headerRowIndex === -1 || headerRowIndex > 25) {
-          headerRowIndex = 0;
-        }
-
-        // Convert filtered JSON back to CSV
-        var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-        csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-        return csv;
-      } catch (e) {
-        console.error(e);
-        return "";
-      }
-    }
-    return gk_fileData[filename] || "";
-  }
-</script>
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>The Configurationator</title>
     <link
       href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;700&display=swap"
@@ -172,15 +125,16 @@
         position: fixed;
         top: 20px;
         left: 0;
-        width: 100%;
-        max-width: 1400px; /* Match container width to prevent overflow */
-        margin: 0 auto; /* Center within viewport */
+        right: 0;
+        width: 100vw; /* Full viewport width */
+        margin: 0 auto; /* Center the content */
         display: flex;
         justify-content: space-between;
         align-items: center;
         padding: 10px 40px;
         background-color: transparent;
         z-index: 1000;
+        box-sizing: border-box;
       }
 
       .button-container-left,
@@ -323,193 +277,6 @@
         background-color: #054a9a;
       }
 
-      /* Tablet and smaller */
-      @media (max-width: 768px) {
-        .button-row {
-          position: static;
-          flex-direction: column;
-          align-items: stretch;
-          padding: 10px;
-          max-width: none; /* Remove max-width on smaller screens */
-          margin: 0;
-          background-color: transparent;
-        }
-
-        .button-container-left,
-        .button-container-right {
-          justify-content: center;
-        }
-
-        .button-container-left {
-          margin-left: 0; /* Remove margin-left on smaller screens */
-        }
-
-        .button-container-right {
-          margin-right: 0; /* Remove margin-right on smaller screens */
-        }
-
-        .manual-button {
-          padding: 12px 16px;
-          font-size: 14px;
-          min-width: 100px;
-        }
-
-        .container {
-          padding: 10px;
-        }
-
-        .table-section {
-          margin: 10px 0;
-        }
-
-        table {
-          font-size: 16px;
-          overflow-x: auto;
-          display: block;
-          white-space: nowrap;
-        }
-
-        th,
-        td {
-          padding: 10px 12px;
-          line-height: 1.4;
-        }
-
-        h1 {
-          font-size: 26px;
-        }
-
-        .sub-title {
-          font-size: 22px;
-        }
-
-        .logo {
-          max-width: 120px;
-          margin: 15px auto;
-        }
-      }
-
-      /* Mobile (small screens and tablets) */
-      @media (max-width: 600px) {
-        table {
-          display: block;
-          overflow-x: auto;
-        }
-
-        thead {
-          display: none;
-        }
-
-        tr {
-          display: block;
-          margin-bottom: 15px;
-          border-bottom: 1px solid #ddd;
-          padding-bottom: 10px;
-        }
-
-        td {
-          display: block;
-          text-align: left;
-          padding: 8px 12px;
-          font-size: 14px;
-          border: none;
-          position: relative;
-          white-space: normal;
-        }
-
-        td:nth-child(1)::before {
-          content: "Configuration Item: ";
-          font-weight: bold;
-          display: block;
-          margin-bottom: 5px;
-          color: #333;
-        }
-
-        td:nth-child(2)::before {
-          content: "Default Value: ";
-          font-weight: bold;
-          display: block;
-          margin-bottom: 5px;
-          color: #333;
-        }
-
-        td:nth-child(3)::before {
-          content: "ZOLL Team Rec's: ";
-          font-weight: bold;
-          display: block;
-          margin-bottom: 5px;
-          color: #333;
-        }
-
-        th:nth-child(1),
-        td:nth-child(1),
-        th:nth-child(2),
-        td:nth-child(2),
-        th:nth-child(3),
-        td:nth-child(3) {
-          width: auto;
-        }
-
-        td[contenteditable="true"] {
-          border: 1px solid #ddd;
-          border-radius: 4px;
-          padding: 8px;
-        }
-
-        .table-section {
-          margin: 15px auto 60px auto;
-        }
-      }
-
-      /* Small mobile screens */
-      @media (max-width: 480px) {
-        .manual-button {
-          width: calc(50% - 10px);
-          padding: 12px 10px;
-          font-size: 12px;
-          min-width: 80px;
-        }
-
-        h1 {
-          font-size: 22px;
-        }
-
-        .sub-title {
-          font-size: 20px;
-        }
-
-        th,
-        td {
-          padding: 8px 10px;
-          font-size: 14px;
-          line-height: 1.4;
-        }
-
-        .modal-content {
-          width: 95%;
-          margin: 10px auto;
-          padding: 10px;
-        }
-
-        .modal-body {
-          padding: 10px;
-        }
-
-        .preview-container img {
-          max-height: 200px;
-        }
-
-        .modal-btn {
-          padding: 10px 20px;
-          font-size: 14px;
-        }
-
-        .logo {
-          max-width: 120px;
-          margin: 15px auto;
-        }
-      }
-
       @media print {
         .logo,
         .button-row,
@@ -546,14 +313,10 @@
     <div class="button-row">
       <div class="button-container-left">
         <button class="manual-button back-home-btn">Back<br />Home</button>
-        <button class="manual-button reset-tables-btn">
-          Reset<br />Tables
-        </button>
+        <button class="manual-button reset-tables-btn">Reset<br />Tables</button>
       </div>
       <div class="button-container-right">
-        <button class="manual-button screenshot-btn">
-          Take<br />Screenshot!
-        </button>
+        <button class="manual-button screenshot-btn">Take<br />Screenshot!</button>
         <button class="manual-button export-pdf-btn">Export<br />as PDF</button>
       </div>
     </div>
@@ -576,11 +339,7 @@
                 id="previewImage"
                 src=""
                 alt="Configuration Preview"
-                style="
-                  max-width: 100%;
-                  max-height: 300px;
-                  border: 1px solid #ddd;
-                "
+                style="max-width: 100%; max-height: 300px; border: 1px solid #ddd;"
               />
             </div>
           </div>
@@ -1376,19 +1135,13 @@
               const recValue = recCell.textContent.trim();
               if (defaultValue !== recValue) {
                 row.classList.add("diff-row");
-                console.log(
-                  `Table ${tableIndex}, Row ${index}: Highlighted (Default: "${defaultValue}", Rec: "${recValue}")`
-                );
+                console.log(`Table ${tableIndex}, Row ${index}: Highlighted (Default: "${defaultValue}", Rec: "${recValue}")`);
               } else {
                 row.classList.remove("diff-row");
-                console.log(
-                  `Table ${tableIndex}, Row ${index}: Not highlighted (Default: "${defaultValue}", Rec: "${recValue}")`
-                );
+                console.log(`Table ${tableIndex}, Row ${index}: Not highlighted (Default: "${defaultValue}", Rec: "${recValue}")`);
               }
             } else {
-              console.warn(
-                `Table ${tableIndex}, Row ${index}: Missing default or rec cell`
-              );
+              console.warn(`Table ${tableIndex}, Row ${index}: Missing default or rec cell`);
             }
           });
         });
